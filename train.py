@@ -173,15 +173,29 @@ sweep_config = {
     }
 }
 
-"""# Utility Functions and classes"""
 
 class Vocabulary:
     def __init__(self):
+        """
+        Initialize the Vocabulary object.
+
+        Attributes:
+        - str_count: A dictionary to store the count of each character encountered.
+        - int_encodding: A dictionary to map characters to integer encodings.
+        - n_chars: An integer representing the total number of unique characters encountered.
+        - str_encodding: A dictionary to map integer encodings back to characters.
+        """
         self.str_count,self.int_encodding = dict(),dict()
         self.n_chars = 4
         self.str_encodding = {0: "<", 1: ">", 2: "?", 3: "."}
 
     def addWord(self, word):
+        """
+        Add a word to the vocabulary.
+
+        Parameters:
+        - word: A string representing the word to be added to the vocabulary.
+        """
         for char in word:
             try:
                 self.str_count[char] += 1
@@ -192,6 +206,23 @@ class Vocabulary:
                 self.n_chars += 1
 
 def prepareData(dir):
+    """
+    Prepare data for training a sequence-to-sequence model.
+
+    Parameters:
+    - dir: A string representing the directory path of the data file.
+           The data file is expected to be in CSV format with two columns:
+           one for input sequences and another for target sequences.
+
+    Returns:
+    - input_lang: An instance of the Vocabulary class containing the vocabulary
+                  for the input sequences.
+    - output_lang: An instance of the Vocabulary class containing the vocabulary
+                   for the target sequences.
+    - pairs: A list of tuples representing input-target pairs extracted from the data.
+    - max_len: An integer representing the maximum sequence length among input and
+               target sequences in the dataset.
+    """
     data = pd.read_csv(dir, sep=DELIMETER, names=[INPUT_LABEL, TARGET_LABEL])
 
     max_input_length = data[INPUT_LABEL].apply(len).max()
@@ -212,7 +243,19 @@ def prepareData(dir):
 
 
 def prepareDataWithAttention(dir):
+    """
+    prepares data for sequence-to-sequence models with attention mechanism by processing a CSV file located at the specified directory
 
+    Parameters:
+    - dir: A string specifying the directory path where the CSV file is located.
+
+    Returns:
+    - input_lang: An instance of the Vocabulary class containing the vocabulary for input sequences.
+    - output_lang: An instance of the Vocabulary class containing the vocabulary for target sequences.
+    - pairs: A list of tuples, each containing an input sequence and its corresponding target sequence.
+    - max_input_length: An integer representing the maximum length of input sequences in the dataset.
+    - max_target_length: An integer representing the maximum length of target
+    """
     data = pd.read_csv(dir, sep=DELIMETER, names=[INPUT_LABEL, TARGET_LABEL])
 
     max_input_length = data[INPUT_LABEL].apply(len).max()
@@ -239,7 +282,24 @@ def prepareDataWithAttention(dir):
     return input_lang, output_lang, pairs, max_input_length, max_target_length
 
 def writeToCSV(actual_X,actual_Y,predicted_Y,file_name):
+    """
+    Writes data from lists actual_X, actual_Y, and predicted_Y into a CSV file specified by file_name.
 
+    Parameters:
+        actual_X (list): A list containing actual values for X.
+        actual_Y (list): A list containing actual values for Y.
+        predicted_Y (list): A list containing predicted values for Y.
+        file_name (str): The name of the CSV file to write the data into.
+
+    Returns:
+        None
+
+    Note:
+        - The function assumes that all input lists have the same length.
+        - Each element of the input lists should be convertible to string.
+        - The CSV file will have three columns: 'Actual X', 'Actual Y', and 'Predicted Y'.
+        - If the file exists, it will be overwritten.
+    """
     table_r = [[''.join(actual_X[i]),''.join(actual_Y[i]),''.join(predicted_Y[i])] for i in range(len(predicted_Y))]
     fields = [CSV_COLUMN_ACTUAL_X,CSV_COLUMN_ACTUAL_Y,CSV_COLUMN_PREDICETED_Y]
 
@@ -256,8 +316,20 @@ def writeToCSV(actual_X,actual_Y,predicted_Y,file_name):
 
 
 
-# helpTensorWithoutAttn
 def helpTensor(lang, word, max_length):
+    """
+    Convert a word into a PyTorch tensor of character indexes according to a provided language mapping,
+    padding it to a specified maximum length.
+
+    Parameters:
+    - lang (dict): A dictionary mapping characters to their corresponding indexes in the language.
+    - word (str): The input word to be converted into a tensor.
+    - max_length (int): The maximum length of the tensor after padding.
+
+    Returns:
+    - result (torch.Tensor): A PyTorch tensor containing the indexes of characters in the word, 
+      padded with SYMBOL_PADDING up to the max_length, and terminated with SYMBOL_END.
+    """
     index_list = []
     for char in word:
         try:
@@ -276,6 +348,20 @@ def helpTensor(lang, word, max_length):
 
 
 def helpTensorWithAttention(lang, word, max_length):
+    """
+    Convert a word into a PyTorch tensor of character indexes according to a provided language mapping,
+    padding it to a specified maximum length, and appending an attention mask.
+
+    Arguments:
+    - lang (dict): A dictionary mapping characters to their corresponding indexes in the language.
+    - word (str): The input word to be converted into a tensor.
+    - max_length (int): The maximum length of the tensor after padding.
+
+    Returns:
+    - result (torch.Tensor): A PyTorch tensor containing the indexes of characters in the word, 
+      padded with SYMBOL_PADDING up to the max_length, and terminated with SYMBOL_END.
+    
+    """
     index_list=[]
     for char in word:
         try:
@@ -296,6 +382,26 @@ def makeTensor(input_lang, output_lang, pairs, reach):
     return res
 
 def accuracy(encoder, decoder, loader, batch_size, criterion, cell_type, num_layers_enc, max_length, output_lang, input_lang,is_test):
+    """
+    Calculate the accuracy of a sequence-to-sequence model on a given dataset.
+
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - loader (torch.utils.data.DataLoader): DataLoader containing the dataset.
+    - batch_size (int): The batch size for processing data.
+    - criterion: The loss criterion used during training.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - num_layers_enc (int): Number of layers in the encoder.
+    - max_length (int): Maximum length of input/output sequences.
+    - output_lang: The language object representing the output language.
+    - input_lang: The language object representing the input language.
+    - is_test (bool): Flag indicating whether the function is used for testing.
+
+    Returns:
+    - accuracy (float): The accuracy of the model on the dataset, as a percentage.
+
+    """
     with torch.no_grad():
         total = correct = 0
         actual_X = []
@@ -368,6 +474,26 @@ def accuracyWithAttention(
     max_length,
     is_test=False
     ):
+    """
+    Calculate the accuracy of a sequence-to-sequence model with attention mechanism on a given dataset.
+
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - loader (torch.utils.data.DataLoader): DataLoader containing the dataset.
+    - batch_size (int): The batch size for processing data.
+    - num_layers_enc (int): Number of layers in the encoder.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - output_lang: The language object representing the output language.
+    - input_lang: The language object representing the input language.
+    - criterion: The loss criterion used during training.
+    - max_length (int): Maximum length of input/output sequences.
+    - is_test (bool, optional): Flag indicating whether the function is used for testing. Default is False.
+
+    Returns:
+    - accuracy (float): The accuracy of the model on the dataset, as a percentage.
+
+    """
 
     with torch.no_grad():
 
@@ -448,28 +574,40 @@ def accuracyWithAttention(
     return (correct / total) * 100
 
 
-# calc_lossWithoutAttn
 def calc_loss(encoder, decoder, input_tensor, target_tensor, batch_size, encoder_optimizer, decoder_optimizer, criterion, cell_type, num_layers_enc, max_length, is_training, teacher_forcing_ratio=0.5):
-    # Initialize the encoder hidden state
+    """
+    Calculate the loss of a sequence-to-sequence model for a single batch.
+
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - input_tensor (torch.Tensor): Input tensor representing the source sequence.
+    - target_tensor (torch.Tensor): Target tensor representing the target sequence.
+    - batch_size (int): The batch size for processing data.
+    - encoder_optimizer (torch.optim.Optimizer): Optimizer for updating encoder parameters.
+    - decoder_optimizer (torch.optim.Optimizer): Optimizer for updating decoder parameters.
+    - criterion: The loss criterion used during training.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - num_layers_enc (int): Number of layers in the encoder.
+    - max_length (int): Maximum length of input/output sequences.
+    - is_training (bool): Flag indicating whether the function is called during training or validation.
+    - teacher_forcing_ratio (float, optional): The probability of using teacher forcing during training. Default is 0.5.
+
+    Returns:
+    - loss (float): The average loss per target length for the batch.
+    """
     output_hidden = encoder.initHidden(batch_size, num_layers_enc)
 
-    # Check if LSTM and initialize cell state
     if cell_type == LSTM_KEY:
         encoder_cell_state = encoder.initHidden(batch_size, num_layers_enc)
         output_hidden = (output_hidden, encoder_cell_state)
 
-    # Zero the gradients
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
-    # Get input and target sequence lengths
-    # input_length = input_tensor.size(0)
-    # target_length = target_tensor.size(0)
 
-    # Initialize loss
     loss = 0
 
-    # Encoder forward pass
     for ei in range(input_tensor.size(0)):
         output_hidden = encoder(input_tensor[ei], batch_size, output_hidden)[1]
 
@@ -518,7 +656,28 @@ def calcLossWithAttention(
     max_length,is_training,
     teacher_forcing_ratio=0.5,
 ):
+    """
+    Calculate the loss of a sequence-to-sequence model with attention mechanism for a single batch.
 
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - encoder_optimizer (torch.optim.Optimizer): Optimizer for updating encoder parameters.
+    - decoder_optimizer (torch.optim.Optimizer): Optimizer for updating decoder parameters.
+    - input_tensor (torch.Tensor): Input tensor representing the source sequence.
+    - target_tensor (torch.Tensor): Target tensor representing the target sequence.
+    - criterion: The loss criterion used during training.
+    - batch_size (int): The batch size for processing data.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - num_layers_enc (int): Number of layers in the encoder.
+    - max_length (int): Maximum length of input/output sequences.
+    - is_training (bool): Flag indicating whether the function is called during training or validation.
+    - teacher_forcing_ratio (float, optional): The probability of using teacher forcing during training. Default is 0.5.
+
+    Returns:
+    - avg_loss (float): The average loss per target length for the batch.
+
+    """
     output_hidden = encoder.initHidden(batch_size, num_layers_enc)
 
     if cell_type == LSTM_KEY:
@@ -600,13 +759,32 @@ def calcLossWithAttention(
     avg_loss = loss.item() / target_length
     return avg_loss
 
-
-
-
-# Train and evaluate the Seq2SeqWithoutAttn model
 def seq2seq(encoder, decoder, train_loader, val_loader, test_loader, lr, optimizer, epochs, max_length_word, num_layers_enc, output_lang, input_lang, batch_size,cell_type,is_wandb):
+    """
+    Calculate the loss of a sequence-to-sequence model with attention mechanism for a single batch.
+
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - encoder_optimizer (torch.optim.Optimizer): Optimizer for updating encoder parameters.
+    - decoder_optimizer (torch.optim.Optimizer): Optimizer for updating decoder parameters.
+    - input_tensor (torch.Tensor): Input tensor representing the source sequence.
+    - target_tensor (torch.Tensor): Target tensor representing the target sequence.
+    - criterion: The loss criterion used during training.
+    - batch_size (int): The batch size for processing data.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - num_layers_enc (int): Number of layers in the encoder.
+    - max_length (int): Maximum length of input/output sequences.
+    - is_training (bool): Flag indicating whether the function is called during training or validation.
+    - teacher_forcing_ratio (float, optional): The probability of using teacher forcing during training. Default is 0.5.
+
+    Returns:
+    - avg_loss (float): The average loss per target length for the batch.
+
+    """
+
     max_length = max_length_word - 1
-    # Define the optimizer and criterion
+
     encoder_optimizer = optim.NAdam(encoder.parameters(), lr=lr) if optimizer == "nadam" else optim.Adam(encoder.parameters(), lr=lr)
     decoder_optimizer = optim.NAdam(decoder.parameters(), lr=lr) if optimizer == "nadam" else optim.Adam(decoder.parameters(), lr=lr)
     criterion = nn.NLLLoss()
@@ -718,6 +896,30 @@ def seq2seqWithAttention(
     cell_type,
     is_wandb
  ):
+    """
+    Train a sequence-to-sequence model with attention mechanism and evaluate its performance.
+
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - train_loader (torch.utils.data.DataLoader): DataLoader containing the training dataset.
+    - val_loader (torch.utils.data.DataLoader): DataLoader containing the validation dataset.
+    - test_loader (torch.utils.data.DataLoader): DataLoader containing the test dataset.
+    - learning_rate (float): The learning rate for optimizer.
+    - optimizer (str): Name of the optimizer to be used (e.g., "adam", "nadam").
+    - epochs (int): The number of epochs for training.
+    - max_length_word (int): Maximum length of words in the vocabulary.
+    - attention: The attention mechanism used in the decoder.
+    - num_layers_enc (int): Number of layers in the encoder.
+    - output_lang: The language object representing the output language.
+    - input_lang: The language object representing the input language.
+    - batch_size (int): The batch size for processing data.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - is_wandb (bool): Flag indicating whether to log results using Weights & Biases.
+
+    Returns:
+    - None
+    """
     max_length = max_length_word - 1
     n_val = len(val_loader)
     n_train = len(train_loader)
@@ -840,7 +1042,30 @@ def seq2seqWithAttention(
             )
 
 def store_heatmaps(encoder, decoder, loader, give_batch_size, given_num_layers_encoder,cell_type, input_lang,max_length,bi_directional,output_lang):
+    """
+    Train a sequence-to-sequence model with attention mechanism and evaluate its performance.
 
+    Args:
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - train_loader (torch.utils.data.DataLoader): DataLoader containing the training dataset.
+    - val_loader (torch.utils.data.DataLoader): DataLoader containing the validation dataset.
+    - test_loader (torch.utils.data.DataLoader): DataLoader containing the test dataset.
+    - learning_rate (float): The learning rate for optimizer.
+    - optimizer (str): Name of the optimizer to be used (e.g., "adam", "nadam").
+    - epochs (int): The number of epochs for training.
+    - max_length_word (int): Maximum length of words in the vocabulary.
+    - attention: The attention mechanism used in the decoder.
+    - num_layers_enc (int): Number of layers in the encoder.
+    - output_lang: The language object representing the output language.
+    - input_lang: The language object representing the input language.
+    - batch_size (int): The batch size for processing data.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - is_wandb (bool): Flag indicating whether to log results using Weights & Biases.
+
+    Returns:
+    - None
+    """
     temp = give_batch_size
     # Evaluating for 10 test inputs so batch size is set to 1
     give_batch_size = 1
@@ -953,6 +1178,25 @@ def store_heatmaps(encoder, decoder, loader, give_batch_size, given_num_layers_e
                 return predictions,attentions,xs
 
 def plot_heatmap(test_loader, encoder, decoder,batch_size,num_layers_encoder,cell_type,max_length_word,input_lang,output_lang,bi_directional):
+    """
+    Plot heatmaps to visualize the attention mechanism of the sequence-to-sequence model.
+
+    Args:
+    - test_loader (torch.utils.data.DataLoader): DataLoader containing the test dataset.
+    - encoder (torch.nn.Module): The encoder module of the sequence-to-sequence model.
+    - decoder (torch.nn.Module): The decoder module of the sequence-to-sequence model.
+    - batch_size (int): The batch size for processing data.
+    - num_layers_encoder (int): Number of layers in the encoder.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - max_length_word (int): Maximum length of words in the vocabulary.
+    - input_lang: The language object representing the input language.
+    - output_lang: The language object representing the output language.
+    - bi_directional (bool): Flag indicating whether the encoder is bidirectional.
+
+    Returns:
+    - None
+
+    """
     max_length = max_length_word
     # input words, predicted words, attentions respectively fetched from store_heatmaps
     predictions,atte,test_english = store_heatmaps(
@@ -1012,6 +1256,20 @@ def plot_heatmap(test_loader, encoder, decoder,batch_size,num_layers_encoder,cel
     wandb.finish()
 
 def beam_search(prepared_d, bw, lp, cell_type, en_de_model, letter):
+    """
+    Perform beam search to generate a sequence using a sequence-to-sequence model.
+
+    Args:
+    - prepared_d (dict): A dictionary containing prepared data for the model.
+    - bw (int): Beam width, i.e., the number of sequences to consider at each step.
+    - lp (float): Length penalty parameter to encourage shorter or longer sequences.
+    - cell_type (str): Type of RNN cell used in the model (e.g., LSTM_KEY).
+    - en_de_model: The sequence-to-sequence model.
+    - letter (str): The input sequence.
+
+    Returns:
+    - str: The generated output sequence.
+    """
     TARGET_REV_KEY = "output_index_rev"
     input_x_dim = prepared_d[MAX_LEN_KEY]+1
     result = np.zeros((input_x_dim, 1), dtype=np.int32)
@@ -1073,10 +1331,34 @@ def beam_search(prepared_d, bw, lp, cell_type, en_de_model, letter):
         final_resut.append(prepared_d[TARGET_REV_KEY][token.item()])
     return ''.join(final_resut)[:-1]
 
-"""# Encoder Class"""
-
-# EncoderRNNWithoutAttn
 class EncoderRNN(nn.Module):
+    """
+    Encoder module of a sequence-to-sequence model.
+
+    Args:
+    - input_size (int): Size of the input vocabulary.
+    - embedding_size (int): Size of the embedding layer.
+    - hidden_size (int): Size of the hidden state of the RNN.
+    - num_layers_encoder (int): Number of layers in the encoder.
+    - cell_type (str): Type of RNN cell used in the encoder (e.g., 'LSTM', 'GRU', 'RNN').
+    - drop_out (float): Dropout probability.
+    - bi_directional (bool): Flag indicating whether the encoder is bidirectional.
+
+    Attributes:
+    - emb_n (int): Embedding size.
+    - hid_n (int): Hidden size.
+    - encoder_n (int): Number of layers in the encoder.
+    - model_key (str): Type of RNN cell used in the encoder.
+    - is_dropout (float): Dropout probability.
+    - is_bi_dir (bool): Flag indicating whether the encoder is bidirectional.
+    - embedding (nn.Embedding): Embedding layer.
+    - dropout (nn.Dropout): Dropout layer.
+    - cell_layer (nn.Module): RNN cell layer.
+
+    Methods:
+    - forward(input, batch_size, hidden): Forward pass of the encoder.
+    - initHidden(batch_size, num_layers_enc): Initialize the hidden state of the encoder.
+    """
     def __init__(self, input_size, embedding_size, hidden_size, num_layers_encoder, cell_type, drop_out, bi_directional):
         super(EncoderRNN, self).__init__()
 
@@ -1100,6 +1382,18 @@ class EncoderRNN(nn.Module):
         )
 
     def forward(self, input, batch_size, hidden):
+        """
+        Forward pass of the encoder.
+
+        Args:
+        - input (torch.Tensor): Input tensor of shape (seq_len, batch_size).
+        - batch_size (int): Batch size.
+        - hidden (torch.Tensor): Initial hidden state.
+
+        Returns:
+        - y_cap (torch.Tensor): Output tensor of the encoder.
+        - hidden (torch.Tensor): Updated hidden state.
+        """
         pre_embedded = self.embedding(input)
         transformed_embedded_data = pre_embedded.view(1, batch_size, -1)
         embedded = self.dropout(transformed_embedded_data)
@@ -1107,6 +1401,16 @@ class EncoderRNN(nn.Module):
         return y_cap, hidden
 
     def initHidden(self, batch_size, num_layers_enc):
+        """
+        Initialize the hidden state of the encoder.
+
+        Args:
+        - batch_size (int): Batch size.
+        - num_layers_enc (int): Number of layers in the encoder.
+
+        Returns:
+        - torch.Tensor: Initial hidden state.
+        """
         if self.is_bi_dir:
             weights = torch.zeros(num_layers_enc * 2 , batch_size, self.hid_n)
         else:
@@ -1118,6 +1422,34 @@ class EncoderRNN(nn.Module):
 
 
 class EncoderRNNWithAttention(nn.Module):
+    """
+    Encoder module of a sequence-to-sequence model with attention mechanism.
+
+    Args:
+    - input_size (int): Size of the input vocabulary.
+    - embedding_size (int): Size of the embedding layer.
+    - hidden_size (int): Size of the hidden state of the RNN.
+    - num_layers_encoder (int): Number of layers in the encoder.
+    - cell_type (str): Type of RNN cell used in the encoder (e.g., 'LSTM', 'GRU', 'RNN').
+    - drop_out (float): Dropout probability.
+    - bi_directional (bool): Flag indicating whether the encoder is bidirectional.
+
+    Attributes:
+    - emb_n (int): Embedding size.
+    - hid_n (int): Hidden size.
+    - encoder_n (int): Number of layers in the encoder.
+    - model_key (str): Type of RNN cell used in the encoder.
+    - is_dropout (float): Dropout probability.
+    - is_bi_dir (bool): Flag indicating whether the encoder is bidirectional.
+    - embedding (nn.Embedding): Embedding layer.
+    - dropout (nn.Dropout): Dropout layer.
+    - cell_layer (nn.Module): RNN cell layer.
+
+    Methods:
+    - forward(input, batch_size, hidden): Forward pass of the encoder.
+    - initHidden(batch_size, num_layers_enc): Initialize the hidden state of the encoder.
+
+    """
     def __init__(self, input_size, embedding_size,hidden_size,num_layers_encoder,cell_type,drop_out,bi_directional):
         super(EncoderRNNWithAttention, self).__init__()
 
@@ -1141,6 +1473,18 @@ class EncoderRNNWithAttention(nn.Module):
         )
 
     def forward(self, input, batch_size, hidden):
+        """
+        Forward pass of the encoder.
+
+        Args:
+        - input (torch.Tensor): Input tensor of shape (seq_len, batch_size).
+        - batch_size (int): Batch size.
+        - hidden (torch.Tensor): Initial hidden state.
+
+        Returns:
+        - y_cap (torch.Tensor): Output tensor of the encoder.
+        - hidden (torch.Tensor): Updated hidden state.
+        """
         pre_embedded = self.embedding(input)
         transformed_embedded_data = pre_embedded.view(1, batch_size, -1)
         embedded = self.dropout(transformed_embedded_data)
@@ -1148,6 +1492,16 @@ class EncoderRNNWithAttention(nn.Module):
         return y_cap, hidden
 
     def initHidden(self, batch_size, num_layers_enc):
+        """
+        Initialize the hidden state of the encoder.
+
+        Args:
+        - batch_size (int): Batch size.
+        - num_layers_enc (int): Number of layers in the encoder.
+
+        Returns:
+        - torch.Tensor: Initial hidden state.
+        """
         if self.is_bi_dir:
             weights = torch.zeros(num_layers_enc * 2 , batch_size, self.hid_n)
         else:
@@ -1157,10 +1511,41 @@ class EncoderRNNWithAttention(nn.Module):
             return weights.cuda()
         return weights
 
-"""# Decoder Class"""
-
-# DecoderRNNWithoutAttn
 class DecoderRNN(nn.Module):
+    """
+    Decoder module of a sequence-to-sequence model.
+
+    Args:
+    - embedding_size (int): Size of the embedding layer.
+    - hidden_size (int): Size of the hidden state of the RNN.
+    - num_layers_decoder (int): Number of layers in the decoder.
+    - cell_type (str): Type of RNN cell used in the decoder (e.g., 'LSTM', 'GRU', 'RNN').
+    - drop_out (float): Dropout probability.
+    - bi_directional (bool): Flag indicating whether the decoder is bidirectional.
+    - output_size (int): Size of the output vocabulary.
+
+    Attributes:
+    - emb_n (int): Embedding size.
+    - hid_n (int): Hidden size.
+    - decoder_n (int): Number of layers in the decoder.
+    - model_key (str): Type of RNN cell used in the decoder.
+    - is_dropout (float): Dropout probability.
+    - is_bi_dir (bool): Flag indicating whether the decoder is bidirectional.
+    - embedding (nn.Embedding): Embedding layer.
+    - dropout (nn.Dropout): Dropout layer.
+    - cell_layer (nn.Module): RNN cell layer.
+    - out (nn.Linear): Linear layer for output.
+    - softmax (nn.LogSoftmax): Softmax activation function.
+
+    Methods:
+    - forward(input, batch_size, hidden): Forward pass of the decoder.
+
+    Note:
+    - This class represents the decoder module of a sequence-to-sequence model.
+    - It takes embedded input tokens and hidden states as inputs, and produces output tokens.
+    - The type of RNN cell (e.g., LSTM, GRU) can be specified during initialization.
+    """
+
     def __init__(self, embedding_size, hidden_size, num_layers_decoder, cell_type, drop_out, bi_directional, output_size):
         super(DecoderRNN, self).__init__()
 
@@ -1196,6 +1581,18 @@ class DecoderRNN(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, batch_size, hidden):
+        """
+        Forward pass of the decoder.
+
+        Args:
+        - input (torch.Tensor): Input tensor of shape (1, batch_size).
+        - batch_size (int): Batch size.
+        - hidden (torch.Tensor): Hidden state tensor.
+
+        Returns:
+        - y_cap (torch.Tensor): Output tensor of the decoder.
+        - hidden (torch.Tensor): Updated hidden state tensor.
+        """
         y_cap = Function.relu(self.dropout(self.embedding(input).view(1, batch_size, -1)))
         y_cap, hidden = self.cell_layer(y_cap, hidden)
 
@@ -1204,6 +1601,40 @@ class DecoderRNN(nn.Module):
 
 
 class DecoderRNNWithAttention(nn.Module):
+    """
+    Decoder module of a sequence-to-sequence model with attention mechanism.
+
+    Args:
+    - hidden_size (int): Size of the hidden state of the RNN.
+    - embedding_size (int): Size of the embedding layer.
+    - cell_type (str): Type of RNN cell used in the decoder (e.g., 'LSTM', 'GRU', 'RNN').
+    - num_layers_decoder (int): Number of layers in the decoder.
+    - drop_out (float): Dropout probability.
+    - max_length_word (int): Maximum length of a word in the input sequence.
+    - output_size (int): Size of the output vocabulary.
+
+    Attributes:
+    - hid_n (int): Hidden size.
+    - emb_n (int): Embedding size.
+    - model_key (str): Type of RNN cell used in the decoder.
+    - decoder_n (int): Number of layers in the decoder.
+    - drop_out (float): Dropout probability.
+    - max_length_word (int): Maximum length of a word in the input sequence.
+    - embedding (nn.Embedding): Embedding layer.
+    - attention_layer (nn.Linear): Linear layer for attention mechanism.
+    - attention_combine (nn.Linear): Linear layer for combining attention and embedded input.
+    - dropout (nn.Dropout): Dropout layer.
+    - cell_layer (nn.Module): RNN cell layer.
+    - out (nn.Linear): Linear layer for output.
+
+    Methods:
+    - forward(input, batch_size, hidden, encoder_outputs): Forward pass of the decoder with attention mechanism.
+
+    Note:
+    - This class represents the decoder module of a sequence-to-sequence model with an attention mechanism.
+    - It takes embedded input tokens, hidden states, and encoder outputs as inputs, and produces output tokens with attention weights.
+    - The type of RNN cell (e.g., LSTM, GRU) can be specified during initialization.
+    """
     def __init__(
         self,
         hidden_size,
@@ -1248,6 +1679,20 @@ class DecoderRNNWithAttention(nn.Module):
         self.out = nn.Linear(self.hid_n, output_size)
 
     def forward(self, input, batch_size, hidden, encoder_outputs):
+        """
+        Forward pass of the decoder with attention mechanism.
+
+        Args:
+        - input (torch.Tensor): Input tensor of shape (1, batch_size).
+        - batch_size (int): Batch size.
+        - hidden (torch.Tensor): Hidden state tensor.
+        - encoder_outputs (torch.Tensor): Encoder outputs tensor.
+
+        Returns:
+        - y_cap (torch.Tensor): Output tensor of the decoder.
+        - hidden (torch.Tensor): Updated hidden state tensor.
+        - attention_weights (torch.Tensor): Attention weights tensor.
+        """
         pre_embedded = self.embedding(input)
         embedded = pre_embedded.view(1, batch_size, -1)
 
@@ -1264,15 +1709,30 @@ class DecoderRNNWithAttention(nn.Module):
 
         y_cap = torch.cat((embedded[0], attention_applied[0]), 1)
         y_cap = Function.relu(self.attention_combine(y_cap).unsqueeze(0))
-        # if self.cell_type=RNN" :
         y_cap, hidden = self.cell_layer(y_cap, hidden)
         y_cap = Function.log_softmax(self.out(y_cap[0]), dim=1)
 
         return y_cap, hidden, attention_weights
 
-"""# Train Function"""
-
 def train(config_defaults = best_params,flag = False,is_wandb = False,is_heat_map = False):
+    """
+    Function to train a sequence-to-sequence model.
+
+    Args:
+    - config_defaults (dict): Dictionary containing default hyperparameters.
+    - flag (bool): Flag indicating whether to use attention mechanism.
+    - is_wandb (bool): Flag indicating whether to use Weights & Biases logging.
+    - is_heat_map (bool): Flag indicating whether to generate attention heatmaps.
+
+    Returns:
+    - None
+
+    Note:
+    - This function is responsible for training a sequence-to-sequence model based on the provided configurations.
+    - If `flag` is True, the function trains a model with attention mechanism. Otherwise, it trains a vanilla sequence-to-sequence model without attention.
+    - If `is_wandb` is True, the function logs the training process using Weights & Biases.
+    - If `is_heat_map` is True, the function generates attention heatmaps for the test data.
+    """
     optimizer = NADAM_KEY
     if is_wandb:
         wandb.init(project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY_NAME,config = config_defaults)
