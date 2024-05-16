@@ -51,19 +51,24 @@ The train.py file contains the implementation of both vanilla and attention-base
 To execute the file, follow these steps:
 1. Ensure that the aksharantar_sampled file is present in the same folder as the train.py file.
 2. Provide the necessary values for all the required arguments while executing the file directly from the terminal. Alternatively, if no arguments are provided, the file will use the default values, which are set to the best parameters. The arguments that can be used are following :
-____________________________________________________________________________________________________________________________________________________________________________
-                        parser = argparse.ArgumentParser(description='Execute the model and calculate the accuracy')
-                        parser.add_argument('-wp', '--wandb_project', type=str, help='wandb project name', default='cs6910_assignment3')
-                        parser.add_argument('-we', '--wandb_entity', type=str, help='wandb entity', default='cs22m029')
-                        parser.add_argument('-es', '--emb_size', type=int, help='embedding size', default=256)
-                        parser.add_argument('-nle', '--num_layers_encoder', type=int, help='number of layers in encoder', default=2)
-                        parser.add_argument('-nld', '--num_layers_decoder', type=int, help='number of layers in decoder', default=2)
-                        parser.add_argument('-hs', '--hidden_size', type=int, help='hidden size', default=256)
-                        parser.add_argument('-bs', '--batch_size', type=int, help='batch size', default=32)
-                        parser.add_argument('-ep', '--epochs', type=int, help='epochs', default=5)
-                        parser.add_argument('-ct', '--cell_type', type=str, help='Cell type', default="LSTM")
-                        parser.add_argument('-bdir', '--bidirectional', type=bool, help='bidirectional', default=False)
-                        parser.add_argument('-drop', '--dropout', type=float, help='dropout', default=0.2)
+
+### Arguments
+
+| Name | Default Value | Description |
+| :---: | :-------------: | :----------- |
+| `-wp`, `--wandb_project` | YOUR_WANDB_PROJECT_NAME | Wandb project name |
+| `-we`, `--wandb_entity` | YOUR_WANDB_ENTITY | wandb entity | 
+| `-es`, `--emb_size` | 256 | embedding size, choice:[16, 32, 64, 256] |
+| `-nle`, `--num_layers_encoder` | 3 | number of layers in encoder, choices:[1, 2, 3] | 
+| `-nld`, `--num_layers_decoder` | 3 | number of layers in decoder, choices:[1, 2, 3] | 
+| `-hs`, `--hidden_size` | 64 | hidden size, choices:  [16, 32, 64, 256] | 
+| `-bs`, `--batch_size` | 32 | batch size, choices: [32, 64, 128] | 
+| `-ep`, `--epochs` | 5 | Number of epochs to train neural network.[5, 10, 15, 20] | 
+| `-ct`, `--cell_type` | "LSTM" | Cell type, choices:  ["RNN", "GRU", "LSTM"] | 
+| `-bdir`, `--bidirectional` | False | choices:  [True, False] | 
+| `-drop`, `--dropout` | 0.2 | dropout value, choices: [0,0.2,0.3] | 
+| `-lr`, `--learning_rate` | 0.001 | Learning rate used to optimize model parameters, choices: [0.001,0.0001,0.0003,0.0005] | 
+| `-at`, `--attention` | 0.001 | Simple seqtoseq model or with attention mechanism, choices: [True, False] | 
 ____________________________________________________________________________________________________________________________________________________________________________
 
 The train.py file is responsible for training the transliteration model. It utilizes a sequence-to-sequence architecture, which consists of an encoder and a decoder. The encoder processes the input sequence (source language) and encodes it into a fixed-length vector representation. The decoder takes this representation and generates the output sequence (target language).
