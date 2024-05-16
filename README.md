@@ -4,6 +4,21 @@
 # Report
 The Link of report for this assignment https://wandb.ai/cs23m007/dl-assignment-3/reports/Assignment-3--Vmlldzo3NjEwNzgz
 
+## Setup
+
+**Note:** It is recommended to create a new python virtual environment before installing dependencies.
+
+```
+pip install requirements.txt
+```
+
+To Run Model
+
+```
+python train.py --epochs 10 --batch_size 16
+``` 
+
+
 # Description of Files:
 **File 1: "predictions_vanilla.csv"**
 
