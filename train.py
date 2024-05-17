@@ -1922,3 +1922,6 @@ def run_sweep():
     print('sweep_id: ', sweep_id)
     train(best_params,flag=True,is_wandb= True,is_heat_map= False)
     wandb.finish()
+
+
+train()
