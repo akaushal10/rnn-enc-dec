@@ -43,7 +43,7 @@ TRAIN_LABEL = "train"
 TEST_LABEL = "test"
 VALID_LABEL = "valid"
 
-DEFAULT_PATH = "/kaggle/input/aksharantar-sampled/aksharantar_sampled"
+DEFAULT_PATH = "./aksharantar_sampled"
 TRAIN_DATASET_PATH = f"{DEFAULT_PATH}/{TARGET_LANG}/{TARGET_LANG}_{TRAIN_LABEL}.csv"
 VALIDATION_DATASET_PATH = f"{DEFAULT_PATH}/{TARGET_LANG}/{TARGET_LANG}_{VALID_LABEL}.csv"
 TEST_DATASET_PATH = f"{DEFAULT_PATH}/{TARGET_LANG}/{TARGET_LANG}_{TEST_LABEL}.csv"
@@ -1561,7 +1561,7 @@ class DecoderRNN(nn.Module):
         self.dropout = nn.Dropout(self.is_dropout)
 
         cell_map = dict({RNN_KEY: nn.RNN, GRU_KEY: nn.GRU, LSTM_KEY: nn.LSTM})
-
+        self.cell_type = cell_type
         if self.cell_type in cell_map:
             self.cell_layer = cell_map[self.model_key](
                 input_size = self.emb_n,
