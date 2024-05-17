@@ -4,16 +4,16 @@ import wandb
 import torch
 import random
 import heapq
+import csv as csv
 import numpy as np
 
-import torch.nn as nn
+from torch import nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 import pandas as pd
 import torch.optim as optim
-import torch.nn.functional as Function
-import csv
+from torch.nn import functional as Function
 from matplotlib.font_manager import FontProperties
 from matplotlib import pyplot as plt
 import argparse
@@ -126,11 +126,10 @@ args=parser.parse_args()
 
 
 # Set the device type to CUDA if available, otherwise use CPU
+device = torch.device("cpu")
 is_gpu = torch.cuda.is_available()
 if is_gpu:
     device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
 
 sweep_config = {
     "name" : "CS6910_Assignemnt3_With Attention",
@@ -200,10 +199,9 @@ class Vocabulary:
             try:
                 self.str_count[char] += 1
             except:
-                self.int_encodding[char] = self.n_chars
-                self.str_encodding[self.n_chars] = char
+                self.int_encodding[char],self.str_encodding[self.n_chars] = self.n_chars,char
                 self.str_count[char] = 1
-                self.n_chars += 1
+                self.n_chars = self.n_chars+ 1
 
 def prepareData(dir):
     """
@@ -270,14 +268,6 @@ def prepareDataWithAttention(dir):
     for pair in pairs:
         input_lang.addWord(pair[0])
         output_lang.addWord(pair[1])
-
-    prepared_data = {
-        "input_lang": input_lang,
-        "output_lang": output_lang,
-        "pairs": pairs,
-        "max_input_length": max_input_length,
-        "max_target_length": max_target_length,
-    }
 
     return input_lang, output_lang, pairs, max_input_length, max_target_length
 
@@ -416,14 +406,14 @@ def accuracy(encoder, decoder, loader, batch_size, criterion, cell_type, num_lay
             target_variable = Variable(batch_y.transpose(0, 1))
 
             if cell_type == LSTM_KEY:
-                encoder_cell_state = encoder.initHidden(batch_size, num_layers_enc)
-                encoder_hidden = (encoder_hidden, encoder_cell_state)
+                encoder_hidden = (encoder_hidden, encoder.initHidden(batch_size, num_layers_enc))
 
 
             output = torch.LongTensor(target_variable.size()[0], batch_size)
 
             for ei in range(input_variable.size()[0]):
-                encoder_hidden = encoder(input_variable[ei], batch_size, encoder_hidden)[1]
+                input_temp = input_variable[ei]
+                encoder_hidden = encoder(input_temp, batch_size, encoder_hidden)[1]
 
             decoder_input = Variable(torch.LongTensor([SYMBOL_BEGIN] * batch_size))
 
@@ -436,12 +426,13 @@ def accuracy(encoder, decoder, loader, batch_size, criterion, cell_type, num_lay
             if is_gpu:
                 decoder_input = decoder_input.cuda()
 
-            decoder_hidden = encoder_hidden
+            dec_hid = encoder_hidden
 
             # Decoder forward pass
             for di in range(target_variable.size()[0]):
-                decoder_output, decoder_hidden = decoder(decoder_input, batch_size, decoder_hidden)
-                topi = decoder_output.data.topk(1)[1]
+                dec_op, dec_hid = decoder(decoder_input, batch_size, dec_hid)
+                temp_top_k = dec_op.data.topk(1) 
+                topi = temp_top_k[1]
                 output[di], decoder_input = torch.cat(tuple(topi)), torch.cat(tuple(topi))
             output = output.transpose(0, 1)
 
@@ -537,7 +528,8 @@ def accuracyWithAttention(
                 )
                 encoder_outputs[ei] = encoder_output[0]
 
-            decoder_input = Variable(torch.LongTensor([SYMBOL_BEGIN] * batch_size))
+            variable_param = torch.LongTensor([SYMBOL_BEGIN] * batch_size)
+            decoder_input = Variable(variable_param)
             if is_gpu:
                 decoder_input = decoder_input.cuda()
 
@@ -599,8 +591,7 @@ def calc_loss(encoder, decoder, input_tensor, target_tensor, batch_size, encoder
     output_hidden = encoder.initHidden(batch_size, num_layers_enc)
 
     if cell_type == LSTM_KEY:
-        encoder_cell_state = encoder.initHidden(batch_size, num_layers_enc)
-        output_hidden = (output_hidden, encoder_cell_state)
+        output_hidden = (output_hidden, encoder.initHidden(batch_size, num_layers_enc))
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -611,36 +602,38 @@ def calc_loss(encoder, decoder, input_tensor, target_tensor, batch_size, encoder
     for ei in range(input_tensor.size(0)):
         output_hidden = encoder(input_tensor[ei], batch_size, output_hidden)[1]
 
-    # Initialize decoder input
-    decoder_input = torch.LongTensor([SYMBOL_BEGIN] * batch_size)
-    decoder_input = decoder_input.cuda() if is_gpu else decoder_input
+    longTensor_batch_size = [SYMBOL_BEGIN] * batch_size
+    decoder_input = torch.LongTensor(longTensor_batch_size)
+    if is_gpu:
+        decoder_input = decoder_input.cuda()
+    use_teacher_forcing = False
+    if random.random() < teacher_forcing_ratio:
+        use_teacher_forcing = True
 
-    # Determine if using teacher forcing
-    use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-
-    # Loop over target sequence
     if is_training:
-        # Training phase
-        for di in range(target_tensor.size(0)):
+        tensor_n = target_tensor.size(0)
+        for di in range(tensor_n):
             decoder_output, output_hidden = decoder(decoder_input, batch_size, output_hidden)
-            decoder_input = target_tensor[di] if use_teacher_forcing else decoder_output.argmax(dim=1)
-            loss = criterion(decoder_output, target_tensor[di]) + loss
+            if use_teacher_forcing:
+                decoder_input = target_tensor[di] 
+            else:
+                decoder_output.argmax(dim=1)
+            loss_cal = criterion(decoder_output, target_tensor[di])
+            loss = loss + loss_cal
     else:
-        # Validation phase
         with torch.no_grad():
-            for di in range(target_tensor.size(0)):
+            for di in range(tensor_n):
                 decoder_output, output_hidden = decoder(decoder_input, batch_size, output_hidden)
-                loss += criterion(decoder_output, target_tensor[di])
+                loss_cal = criterion(decoder_output, target_tensor[di])
+                loss = loss + loss_cal
                 decoder_input = decoder_output.argmax(dim=1)
 
-    # Backpropagation and optimization in training phase
     if is_training:
         loss.backward()
         encoder_optimizer.step()
         decoder_optimizer.step()
-
-    # Return the average loss per target length
-    return loss.item() / target_tensor.size(0)
+    loss_result = loss.item() / target_tensor.size(0)
+    return loss_result
 
 def calcLossWithAttention(
     encoder,
@@ -688,8 +681,7 @@ def calcLossWithAttention(
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
 
-    input_length = input_tensor.size(0)
-    target_length = target_tensor.size(0)
+    input_length,target_length = input_tensor.size(0),target_tensor.size(0)
 
     encoder_outputs = Variable(torch.zeros(max_length, batch_size, encoder.hid_n))
     if is_gpu:
@@ -697,15 +689,16 @@ def calcLossWithAttention(
     loss = 0
 
     for ei in range(input_length):
+        input_temp = input_tensor[ei]
         encoder_output, output_hidden = encoder(
-            input_tensor[ei], batch_size, output_hidden
+            input_temp, batch_size, output_hidden
         )
         encoder_outputs[ei] = encoder_output[0]
 
     decoder_input = Variable(torch.LongTensor([SYMBOL_BEGIN] * batch_size))
     if is_gpu :
         decoder_input = decoder_input.cuda()
-    decoder_hidden = output_hidden
+    dec_hid = output_hidden
     if is_training:
         use_teacher_forcing = False
         if random.random() < teacher_forcing_ratio:
@@ -713,27 +706,29 @@ def calcLossWithAttention(
         n = target_length
         if not use_teacher_forcing :
             for di in range(n):
-                decoder_output, decoder_hidden, decoder_attention = decoder(
+                enc_reshape = encoder_outputs.reshape(batch_size, max_length, encoder.hid_n)
+                dec_opt, dec_hid, dec_att = decoder(
                     decoder_input,
                     batch_size,
-                    decoder_hidden,
-                    encoder_outputs.reshape(batch_size, max_length, encoder.hid_n),
+                    dec_hid,
+                    enc_reshape,
                 )
-                #2 for loop ko bhar dal de
-                topv, topi = decoder_output.data.topk(1)
-                decoder_input = torch.cat(tuple(topi))
+                _, top_i = dec_opt.data.topk(1)
+                decoder_input = torch.cat(tuple(top_i))
                 if is_gpu :
                     decoder_input = decoder_input.cuda()
-                loss += criterion(decoder_output, target_tensor[di])
+                loss += criterion(dec_opt, target_tensor[di])
         else:
             for di in range(n):
-                decoder_output, decoder_hidden, decoder_attention = decoder(
+                enc_reshape = encoder_outputs.reshape(batch_size, max_length, encoder.hid_n)
+                dec_opt, dec_hid, dec_att = decoder(
                     decoder_input,
                     batch_size,
-                    decoder_hidden,
-                    encoder_outputs.reshape(batch_size, max_length, encoder.hid_n),
+                    dec_hid,
+                    enc_reshape,
                 )
-                loss += criterion(decoder_output, target_tensor[di])
+                loss_cal = criterion(dec_opt, target_tensor[di])
+                loss += loss_cal
                 decoder_input = target_tensor[di]
 
 
@@ -743,18 +738,20 @@ def calcLossWithAttention(
         decoder_optimizer.step()
     else :
         for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
+            enc_reshape = encoder_outputs.reshape(batch_size, max_length, encoder.hid_n)
+            dec_opt, dec_hid, _ = decoder(
                 decoder_input,
                 batch_size,
-                decoder_hidden,
-                encoder_outputs.reshape(batch_size, max_length, encoder.hid_n),
+                dec_hid,
+                enc_reshape,
             )
-            topv, topi = decoder_output.data.topk(1)
-            decoder_input = torch.cat(tuple(topi))
+            _, top_i = dec_opt.data.topk(1)
+            immuatble_top_i = tuple(top_i)
+            decoder_input = torch.cat(immuatble_top_i)
 
             if is_gpu:
                 decoder_input = decoder_input.cuda()
-            loss += criterion(decoder_output, target_tensor[di])
+            loss = loss + criterion(dec_opt, target_tensor[di])
 
     avg_loss = loss.item() / target_length
     return avg_loss
@@ -793,26 +790,30 @@ def seq2seq(encoder, decoder, train_loader, val_loader, test_loader, lr, optimiz
         train_loss_total = 0
         val_loss_total = 0
 
+        train_n = len(train_loader)
         # Training phase
         for batch_x, batch_y in train_loader:
-            batch_x = Variable(batch_x.transpose(0, 1))
-            batch_y = Variable(batch_y.transpose(0, 1))
-            # Calculate the training loss
+            batch_x,batch_y = Variable(batch_x.transpose(0, 1)),Variable(batch_y.transpose(0, 1))
             loss = calc_loss(encoder, decoder, batch_x, batch_y, batch_size, encoder_optimizer, decoder_optimizer, criterion, cell_type, num_layers_enc, max_length, is_training=True)
             train_loss_total += loss
 
-        train_loss_avg = train_loss_total / len(train_loader)
+        train_loss_avg = train_loss_total / train_n
         print(f"Epoch: {epoch} | Train Loss: {train_loss_avg:.4f} |", end="")
 
         # Validation phase
-        for batch_x, batch_y in val_loader:
-            batch_x = Variable(batch_x.transpose(0, 1))
-            batch_y = Variable(batch_y.transpose(0, 1))
+        val_n = len(val_loader)
+        for batch_temp in val_loader:
+            batch_x = batch_temp[0]
+            batch_y = batch_temp[1]
+            batch_x_t = batch_x.transpose(0, 1)
+            batch_y_t = batch_y.transpose(0, 1)
+            batch_x = Variable(batch_x_t)
+            batch_y = Variable(batch_y_t)
             # Calculate the validation loss
             loss = calc_loss(encoder, decoder, batch_x, batch_y, batch_size, encoder_optimizer, decoder_optimizer, criterion, cell_type, num_layers_enc, max_length, is_training=False)
             val_loss_total += loss
 
-        val_loss_avg = val_loss_total / len(val_loader)
+        val_loss_avg = val_loss_total / val_n
         print(f"Val Loss: {val_loss_avg:.4f} |", end="")
 
         train_acc = accuracy(
@@ -939,8 +940,7 @@ def seq2seqWithAttention(
         train_loss_total, val_loss_total = 0, 0
 
         for batchx, batchy in train_loader:
-            batchx = Variable(batchx.transpose(0, 1))
-            batchy = Variable(batchy.transpose(0, 1))
+            batchx,batchy = Variable(batchx.transpose(0, 1)),Variable(batchy.transpose(0, 1))
             loss = calcLossWithAttention(
                 encoder = encoder,
                 decoder =decoder,
@@ -1651,9 +1651,8 @@ class DecoderRNNWithAttention(nn.Module):
         self.hid_n = hidden_size
         self.emb_n = embedding_size
         self.model_key = cell_type
-        self.decoder_n = num_layers_decoder
-        self.drop_out = drop_out
         self.max_length_word = max_length_word
+        self.decoder_n,self.drop_out = num_layers_decoder,drop_out
 
         self.embedding = nn.Embedding(output_size, embedding_dim=self.emb_n)
         layer_size = self.emb_n + self.hid_n
@@ -1668,14 +1667,15 @@ class DecoderRNNWithAttention(nn.Module):
         self.cell_layer = None
         cell_map = dict({RNN_KEY: nn.RNN, GRU_KEY: nn.GRU, LSTM_KEY: nn.LSTM})
 
-        if self.model_key in cell_map:
+        try:
             self.cell_layer = cell_map[self.model_key](
                 self.emb_n,
                 self.hid_n,
                 num_layers=self.decoder_n,
                 dropout=self.drop_out,
             )
-
+        except:
+            pass
         self.out = nn.Linear(self.hid_n, output_size)
 
     def forward(self, input, batch_size, hidden, encoder_outputs):
@@ -1701,16 +1701,18 @@ class DecoderRNNWithAttention(nn.Module):
         attention_weights = Function.softmax(
             self.attention_layer(torch.cat((embedded[0],hidden[0][0] if self.model_key == LSTM_KEY else hidden[0]), 1)), dim=1
         )
-
+        att_w = attention_weights.view(batch_size, 1, self.max_length_word)
         attention_applied = torch.bmm(
-            attention_weights.view(batch_size, 1, self.max_length_word),
+            att_w,
             encoder_outputs,
-        ).view(1, batch_size, -1)
+        )
+        attention_applied = attention_applied.view(1, batch_size, -1)
 
         y_cap = torch.cat((embedded[0], attention_applied[0]), 1)
         y_cap = Function.relu(self.attention_combine(y_cap).unsqueeze(0))
         y_cap, hidden = self.cell_layer(y_cap, hidden)
-        y_cap = Function.log_softmax(self.out(y_cap[0]), dim=1)
+        temp_y_cap = self.out(y_cap[0])
+        y_cap = Function.log_softmax(temp_y_cap, dim=1)
 
         return y_cap, hidden, attention_weights
 
@@ -1851,9 +1853,8 @@ def train(config_defaults = best_params,flag = False,is_wandb = False,is_heat_ma
         print(max_len)
 
         # Convert data to tensors and create data loaders
-        pairs = makeTensor(input_langs, output_langs, pairs, max_len)
-        val_pairs = makeTensor(input_langs, output_langs, val_pairs, max_len)
         test_pairs = makeTensor(input_langs, output_langs, test_pairs, max_len)
+        pairs,val_pairs = makeTensor(input_langs, output_langs, pairs, max_len),makeTensor(input_langs, output_langs, val_pairs, max_len)
 
         train_loader = DataLoader(dataset = pairs, batch_size=config_defaults[BATCH_SIZE_KEY], shuffle=True)
         val_loader = DataLoader(dataset = val_pairs, batch_size=config_defaults[BATCH_SIZE_KEY], shuffle=True)
